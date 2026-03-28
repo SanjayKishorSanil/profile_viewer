@@ -1,0 +1,22 @@
+services:
+  mysql:
+    image: mysql:8
+    container_name: my-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: pass@123
+      MYSQL_DATABASE: profile_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mysql_data:/var/lib/mysql
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin
+    restart: always
+    environment:
+      - PMA_HOST=mysql
+      - MYSQL_ROOT_PASSWORD=pass@123
+    ports:
+      - "8080:80"  
