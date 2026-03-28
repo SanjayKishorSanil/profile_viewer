@@ -2,6 +2,7 @@ const db = require('../db');
 
 exports.getProfile = async (req, res) => {
   try {
+    //process 1
     const [userRows] = await db.query('SELECT * FROM user_profile LIMIT 1');
     
     if (userRows.length === 0) {
@@ -9,9 +10,15 @@ exports.getProfile = async (req, res) => {
     }
     
     const userId = userRows[0].id;
+
+    //process 2
     
     const [educationRows] = await db.query('SELECT * FROM education WHERE user_id = ? ORDER BY start_year DESC', [userId]);
+
+    //process 3
     const [skillsRows] = await db.query('SELECT * FROM skills WHERE user_id = ?', [userId]);
+
+    //process 4
     const [achievementsRows] = await db.query('SELECT * FROM achievements WHERE user_id = ? ORDER BY year DESC', [userId]);
 
     const profileData = {

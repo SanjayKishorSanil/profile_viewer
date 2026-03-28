@@ -64,9 +64,21 @@ function App() {
 
   const [chatOpen, setChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
+  
+  const initialGreeting = `Hey there! 👋 I am Profy, the personal AI assistant for this portfolio! 
+
+Here is a quick walkthrough of what you can explore:
+🎓 Education: Expand the card to view the academic journey.
+🏆 Achievements: Discover real-world projects and hackathons.
+💻 Skills Matrix: Check out core technical strengths.
+🎨 Hobbies: See what happens outside of code!
+
+Feel free to interact with any of the 3D cards, or click one of the suggested questions below to start chatting with me!`;
+
   const [chatMessages, setChatMessages] = useState([
-    { id: 1, text: "Hi! I'm an AI assistant based on this student's profile. Ask me anything about their education, skills, or background!", sender: 'ai' }
+    { id: 1, text: initialGreeting, sender: 'ai' }
   ]);
+  const [chatSuggested, setChatSuggested] = useState([]);
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef(null);
 
@@ -101,6 +113,19 @@ function App() {
       const res = await axios.get('/api/profile');
       setProfileData(res.data);
       setLoading(false);
+      
+      // Auto-open chat to present Profy's walkthrough naturally after load animations finish
+      setTimeout(() => setChatOpen(true), 1200);
+
+      // Lazily hook generative AI to formulate initial recruiter suggestions tailored exactly to this fetched profile!
+      axios.post('/api/chat/suggestions', { profileContext: res.data })
+        .then(suggRes => {
+          if (suggRes.data.suggestions) {
+            setChatSuggested(suggRes.data.suggestions);
+          }
+        })
+        .catch(err => console.error("Error fetching AI suggestions:", err));
+
     } catch (err) {
       console.error(err);
       setError('Failed to fetch profile. Make sure the backend is running.');
@@ -108,28 +133,35 @@ function App() {
     }
   };
 
-  const handleChatSubmit = async (e) => {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
-
-    const newQuery = chatInput.trim();
+  const sendMessage = async (queryText) => {
+    if (!queryText.trim() || chatLoading) return;
+    
     setChatInput('');
-    setChatMessages(prev => [...prev, { id: Date.now(), text: newQuery, sender: 'user' }]);
+    setChatSuggested([]); // Hide chips while loading
+    setChatMessages(prev => [...prev, { id: Date.now(), text: queryText, sender: 'user' }]);
     setChatLoading(true);
 
     try {
       const res = await axios.post('/api/chat', { 
-        question: newQuery, 
+        question: queryText, 
         profileContext: profileData 
       });
       
       setChatMessages(prev => [...prev, { id: Date.now(), text: res.data.answer || "Sorry, I couldn't generate a response.", sender: 'ai' }]);
+      if (res.data.suggestions && res.data.suggestions.length > 0) {
+        setChatSuggested(res.data.suggestions);
+      }
     } catch (err) {
       console.error(err);
       setChatMessages(prev => [...prev, { id: Date.now(), text: 'Network error communicating with AI.', sender: 'ai' }]);
     } finally {
       setChatLoading(false);
     }
+  };
+
+  const handleChatSubmit = (e) => {
+    e.preventDefault();
+    sendMessage(chatInput);
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-medium text-slate-500 dark:text-slate-400 animate-pulse bg-slate-50 dark:bg-slate-900">Loading profile...</div>;
@@ -303,8 +335,8 @@ function App() {
                     <Bot className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-sm tracking-wide">AI Assistant</h3>
-                    <p className="text-[10px] text-indigo-100 font-medium opacity-90">Ask me about {user.name.split(' ')[0]}</p>
+                    <h3 className="font-bold text-sm tracking-wide">Profy AI</h3>
+                    <p className="text-[10px] text-indigo-100 font-medium opacity-90">Personal Assistant to {user.name.split(' ')[0]}</p>
                   </div>
                 </div>
                 <button 
@@ -335,6 +367,22 @@ function App() {
                     <span className="w-2 h-2 rounded-full bg-indigo-400 dark:bg-indigo-500 animate-bounce" style={{ animationDelay: '300ms' }}></span>
                   </motion.div>
                 )}
+                
+                {/* Suggested Questions Quick Replies */}
+                {!chatLoading && chatSuggested.length > 0 && (
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap gap-2 pt-3 pb-2">
+                    {chatSuggested.map((q, idx) => (
+                      <button 
+                        key={idx} 
+                        onClick={() => sendMessage(q)}
+                        className="text-[12px] font-medium bg-indigo-50/80 dark:bg-slate-800/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-700/50 px-3.5 py-2 rounded-2xl shadow-sm hover:bg-indigo-100 dark:hover:bg-indigo-900/50 hover:border-indigo-300 transition-all text-left w-fit max-w-[100%] leading-relaxed"
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+                
                 <div ref={chatEndRef} />
               </div>
 
